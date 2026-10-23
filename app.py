@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from curl_cffi import requests as cffi_requests
 
-# Автоматическая установка бинарников Playwright для облака (Streamlit Cloud)
+# Автоматическая установка бинарников Playwright для облака
 @st.cache_resource
 def install_playwright():
     try:
@@ -186,7 +186,7 @@ def check_drom_playwright(page, width, profile, radius, season, year_from, enabl
             content = page.content()
 
         if "smart-captcha" in content or "Вы не робот?" in content:
-            st.warning("⚠️ Дром затребовал капчу! Прокликни её в открывшемся окне (есть 25 сек)...")
+            st.warning("⚠️ Дром затребовал капчу! Если вы запущены локально, прокликните её в открывшемся окне (25 сек)...")
             for _ in range(25):
                 time.sleep(1)
                 try:
@@ -300,7 +300,7 @@ def check_avito_playwright(page, width, profile, radius, season, year_from, enab
             year_val = extract_year(raw_item_text)
             is_new = is_new_condition(raw_item_text)
 
-            # Переход в карточку объявления с надежным ожиданием характеристик
+            # Переход в карточку объявления
             try:
                 detail_page = page.context.new_page()
                 detail_page.goto(link, wait_until="domcontentloaded", timeout=15000)
@@ -393,12 +393,19 @@ if st.button("🔍 Запустить поиск"):
         scraped_items = []
         
         with sync_playwright() as p:
+            # Автоматическое определение режима: если запущено в Streamlit Cloud, то headless=True
+            is_cloud = os.getenv("STREAMLIT_RUNTIME_ENV") is not None or not os.path.exists("/app") and os.name != "nt"
+            # На всякий случай проверяем наличие графической среды (если вы в контейнере без дисплея)
+            use_headless = True if os.getenv("CI") or os.getenv("RENDER") or not os.environ.get("DISPLAY") else False
+            
+            # Для локальной разработки можете принудительно ставить False, но в облаке строго True:
             browser = p.chromium.launch(
-                headless=False,
+                headless=use_headless, 
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     "--no-sandbox",
-                    "--disable-setuid-sandbox"
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage"
                 ]
             )
             

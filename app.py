@@ -4,10 +4,22 @@ import os
 import time
 import base64
 import re
+import subprocess
+import sys
 from datetime import datetime
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from curl_cffi import requests as cffi_requests
+
+# Автоматическая установка бинарников Playwright для облака (Streamlit Cloud)
+@st.cache_resource
+def install_playwright():
+    try:
+        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+    except Exception:
+        pass
+
+install_playwright()
 
 st.set_page_config(
     page_title="Сканер шин — Красноярск",
@@ -52,7 +64,6 @@ def is_new_condition(text):
         return False
     text_lower = text.lower()
     
-    # Прямые ключевые слова для состояния "Новое"
     keywords = [
         "состояние: новое", "состояние новое", "состояние: нов",
         "новое", "новые", "новый", "нов.", "без пробега",
@@ -93,7 +104,6 @@ def parse_avito_details_soup(soup):
     year_val = None
     is_new = False
 
-    # Поиск по специальным контейнерам параметров
     params_containers = soup.select("[data-marker='item-view/item-params'], [data-marker*='item-params']")
     
     if not params_containers:
@@ -119,7 +129,6 @@ def parse_avito_details_soup(soup):
                 if is_new_condition(text):
                     is_new = True
 
-    # Резервный анализ по всему тексту объявления
     full_text = soup.get_text(" ", strip=True)
     if not year_val:
         year_val = extract_year(full_text)
@@ -221,7 +230,6 @@ def check_drom_playwright(page, width, profile, radius, season, year_from, enabl
 
             year_val = extract_year(full_text)
             
-            # Проверка года только если включен фильтр
             if enable_year_filter and year_val and year_val < year_from:
                 continue
 
@@ -292,13 +300,13 @@ def check_avito_playwright(page, width, profile, radius, season, year_from, enab
             year_val = extract_year(raw_item_text)
             is_new = is_new_condition(raw_item_text)
 
-            # Переход в карточку объявления
+            # Переход в карточку объявления с надежным ожиданием характеристик
             try:
                 detail_page = page.context.new_page()
                 detail_page.goto(link, wait_until="domcontentloaded", timeout=15000)
                 
                 try:
-                    detail_page.wait_for_selector("[data-marker*='item-params'], h2, h3", timeout=3000)
+                    detail_page.wait_for_selector("[data-marker*='item-params'], h2, h3", timeout=4000)
                 except Exception:
                     pass
 
@@ -327,7 +335,6 @@ def check_avito_playwright(page, width, profile, radius, season, year_from, enab
             if not is_season_match(full_text_for_filter, season):
                 continue
 
-            # Фильтрация по году (только если чекбокс активен)
             if enable_year_filter and year_val and year_val < year_from:
                 continue
 
